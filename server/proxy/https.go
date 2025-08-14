@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	v1 "github.com/fatedier/frp/pkg/config/v1"
+	"github.com/fatedier/frp/pkg/util/kube"
 	"github.com/fatedier/frp/pkg/util/util"
 	"github.com/fatedier/frp/pkg/util/vhost"
 )
@@ -67,6 +68,19 @@ func (pxy *HTTPSProxy) Run() (remoteAddr string, err error) {
 		xl.Infof("https proxy listen for host [%s]", routeConfig.Domain)
 		pxy.listeners = append(pxy.listeners, l)
 		addrs = append(addrs, util.CanonicalAddr(routeConfig.Domain, pxy.serverCfg.VhostHTTPSPort))
+
+		if kube.IsKubernetes() {
+			xl.Infof("setting custom domain [%s] label for https proxy", routeConfig.Domain)
+			// Label the pod with the custom domain for Kubernetes environments
+			// This allows Kubernetes to manage the domain routing correctly
+			// and ensures that the pod is discoverable via the custom domain.
+			// This is particularly useful for Ingress controllers or when using
+			// custom DNS solutions in Kubernetes.
+			err := kube.LabelPodWithCustomDomain(pxy.ctx, routeConfig.Domain)
+			if err != nil {
+				xl.Warnf("failed to label pod with https custom domain [%s]: %v", routeConfig.Domain, err)
+			}
+		}
 	}
 
 	if pxy.cfg.SubDomain != "" {
@@ -79,6 +93,15 @@ func (pxy *HTTPSProxy) Run() (remoteAddr string, err error) {
 		xl.Infof("https proxy listen for host [%s]", routeConfig.Domain)
 		pxy.listeners = append(pxy.listeners, l)
 		addrs = append(addrs, util.CanonicalAddr(routeConfig.Domain, pxy.serverCfg.VhostHTTPSPort))
+
+		if kube.IsKubernetes() {
+			xl.Infof("setting custom domain [%s] label for https subdomain proxy", routeConfig.Domain)
+
+			err := kube.LabelPodWithCustomDomain(pxy.ctx, routeConfig.Domain)
+			if err != nil {
+				xl.Warnf("failed to label pod with https subdomain domain [%s]: %v", routeConfig.Domain, err)
+			}
+		}
 	}
 
 	pxy.startCommonTCPListenersHandler()
@@ -87,5 +110,19 @@ func (pxy *HTTPSProxy) Run() (remoteAddr string, err error) {
 }
 
 func (pxy *HTTPSProxy) Close() {
+	xl := pxy.xl
+
 	pxy.BaseProxy.Close()
+
+	for _, domain := range pxy.cfg.CustomDomains {
+		if domain == "" {
+			continue
+		}
+
+		xl.Infof("removing custom domain [%s] label for https proxy", domain)
+
+		if err := kube.RemoveCustomDomainLabelFromPod(pxy.ctx, domain); err != nil {
+			xl.Warnf("failed to remove custom domain label from pod [%s]: %v", pxy.loginMsg.Hostname, err)
+		}
+	}
 }
