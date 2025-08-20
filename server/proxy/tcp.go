@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	v1 "github.com/fatedier/frp/pkg/config/v1"
+	"github.com/fatedier/frp/pkg/util/kube"
 )
 
 func init() {
@@ -83,6 +84,15 @@ func (pxy *TCPProxy) Run() (remoteAddr string, err error) {
 	}
 
 	pxy.cfg.RemotePort = pxy.realBindPort
+
+	if pxy.rc.KubeClient != nil {
+		xl.Infof("setting remote port [%d] label for tcp proxy", pxy.cfg.RemotePort)
+		err := kube.AddRemoveLabelPodWithPrefix(pxy.ctx, pxy.rc.KubeClient, kube.AddLabel, kube.TcpPortLabelPrefix, strconv.Itoa(pxy.cfg.RemotePort))
+		if err != nil {
+			xl.Warnf("failed to label pod with remote tcp port [%d]: %v", pxy.cfg.RemotePort, err)
+		}
+	}
+
 	remoteAddr = fmt.Sprintf(":%d", pxy.realBindPort)
 	pxy.startCommonTCPListenersHandler()
 	return
@@ -92,5 +102,12 @@ func (pxy *TCPProxy) Close() {
 	pxy.BaseProxy.Close()
 	if pxy.cfg.LoadBalancer.Group == "" {
 		pxy.rc.TCPPortManager.Release(pxy.realBindPort)
+	}
+
+	if pxy.rc.KubeClient != nil {
+		pxy.xl.Infof("removing remote port [%d] label for tcp proxy", pxy.cfg.RemotePort)
+		if err := kube.AddRemoveLabelPodWithPrefix(pxy.ctx, pxy.rc.KubeClient, kube.RemoveLabel, kube.TcpPortLabelPrefix, strconv.Itoa(pxy.cfg.RemotePort)); err != nil {
+			pxy.xl.Warnf("failed to remove remote port label from pod [%s]: %v", pxy.loginMsg.Hostname, err)
+		}
 	}
 }

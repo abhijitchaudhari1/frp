@@ -16,7 +16,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -29,7 +28,6 @@ import (
 	"github.com/fatedier/frp/pkg/msg"
 	"github.com/fatedier/frp/pkg/transport"
 	netpkg "github.com/fatedier/frp/pkg/util/net"
-	"github.com/fatedier/frp/pkg/util/vhost"
 	"github.com/fatedier/frp/pkg/util/wait"
 	"github.com/fatedier/frp/pkg/util/xlog"
 	"github.com/fatedier/frp/pkg/vnet"
@@ -171,11 +169,6 @@ func (ctl *Control) handleNewProxyResp(m msg.Message) {
 	err := ctl.pm.StartProxy(inMsg.ProxyName, inMsg.RemoteAddr, inMsg.Error)
 	if err != nil {
 		if strings.Contains(err.Error(), "router config conflict") {
-			xl.Warnf("[%s] conflict error found, restarting control connection string", inMsg.ProxyName)
-			ctl.closeSession()
-		}
-
-		if errors.Is(err, vhost.ErrRouterConfigConflict) {
 			xl.Warnf("[%s] conflict error found, restarting control connection", inMsg.ProxyName)
 			ctl.closeSession()
 		}

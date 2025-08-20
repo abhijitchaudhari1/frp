@@ -31,6 +31,8 @@ import (
 	fmux "github.com/hashicorp/yamux"
 	quic "github.com/quic-go/quic-go"
 	"github.com/samber/lo"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/fatedier/frp/pkg/auth"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
@@ -55,8 +57,6 @@ import (
 	"github.com/fatedier/frp/server/ports"
 	"github.com/fatedier/frp/server/proxy"
 	"github.com/fatedier/frp/server/visitor"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 const (
@@ -96,9 +96,6 @@ type Service struct {
 
 	// Accept pipe connections from ssh tunnel gateway
 	sshTunnelListener *netpkg.InternalListener
-
-	// Kubernetes client for managing custom domain labels
-	kubeClient kubernetes.Interface
 
 	// Manage all controllers
 	ctlManager *ControlManager
@@ -175,6 +172,24 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 	}
 	if webServer != nil {
 		webServer.RouteRegister(svr.registerRouteHandlers)
+	}
+
+	// clean up old custom domain labels
+	if kube.IsKubernetes() {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		clientset, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			return nil, err
+		}
+
+		svr.rc.KubeClient = clientset
+		if err := kube.RemoveAllPrefixLabelsFromPod(svr.ctx, svr.rc.KubeClient); err != nil {
+			return nil, fmt.Errorf("failed to remove all prefix labels from pod: %v", err)
+		}
 	}
 
 	// Create tcpmux httpconnect multiplexer.
@@ -313,25 +328,6 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 
 	// Create https vhost muxer.
 	if cfg.VhostHTTPSPort > 0 {
-		// clean up old custom domain labels
-		if kube.IsKubernetes() {
-			config, err := rest.InClusterConfig()
-			if err != nil {
-				return nil, err
-			}
-
-			clientset, err := kubernetes.NewForConfig(config)
-			if err != nil {
-				return nil, err
-			}
-
-			svr.rc.KubeClient = clientset
-
-			if err := kube.RemoveAllCustomDomainLabelsFromPod(svr.ctx, clientset); err != nil {
-				return nil, fmt.Errorf("failed to remove all custom domain labels from pod: %v", err)
-			}
-		}
-
 		var l net.Listener
 		if httpsMuxOn {
 			l = svr.muxer.ListenHTTPS(1)

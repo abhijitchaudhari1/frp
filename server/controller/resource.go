@@ -60,6 +60,7 @@ type ResourceController struct {
 	// All server manager plugin
 	PluginManager *plugin.Manager
 
+	// Kubernetes client for managing custom domain labels
 	KubeClient kubernetes.Interface
 }
 

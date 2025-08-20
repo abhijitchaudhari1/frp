@@ -62,6 +62,7 @@ type Proxy interface {
 
 type BaseProxy struct {
 	name          string
+	isLabeled     bool
 	rc            *controller.ResourceController
 	listeners     []net.Listener
 	usedPortsNum  int

@@ -75,6 +75,11 @@ func validateDomainConfigForClient(c *v1.DomainConfig) error {
 	if c.SubDomain == "" && len(c.CustomDomains) == 0 {
 		return errors.New("subdomain and custom domains should not be both empty")
 	}
+
+	if len(c.CustomDomains) > 1 {
+		return errors.New("only one custom domain is supported in client")
+	}
+
 	return nil
 }
 

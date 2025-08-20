@@ -32,6 +32,10 @@ type OidcAuthProvider struct {
 	tokenGenerator *clientcredentials.Config
 }
 
+type OidcAuthClaims struct {
+	PartitionId string `json:"prt_id"`
+}
+
 func NewOidcAuthSetter(additionalAuthScopes []v1.AuthScope, cfg v1.AuthOIDCClientConfig) *OidcAuthProvider {
 	eps := make(map[string][]string)
 	for k, v := range cfg.AdditionalEndpointParams {

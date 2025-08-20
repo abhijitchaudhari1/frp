@@ -123,6 +123,7 @@ type NewProxy struct {
 	Headers           map[string]string `json:"headers,omitempty"`
 	ResponseHeaders   map[string]string `json:"response_headers,omitempty"`
 	RouteByHTTPUser   string            `json:"route_by_http_user,omitempty"`
+	LocalPort         int               `json:"local_port,omitempty"`
 
 	// stcp, sudp, xtcp
 	Sk         string   `json:"sk,omitempty"`

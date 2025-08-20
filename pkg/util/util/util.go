@@ -134,3 +134,11 @@ func RandomSleep(duration time.Duration, minRatio, maxRatio float64) time.Durati
 func ConstantTimeEqString(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
+
+func Clone[M ~map[K]V, K comparable, V any](m M) M {
+	cp := make(M, len(m))
+	for k, v := range m {
+		cp[k] = v
+	}
+	return cp
+}
