@@ -41,6 +41,7 @@ import (
 	"github.com/fatedier/frp/pkg/ssh"
 	"github.com/fatedier/frp/pkg/transport"
 	httppkg "github.com/fatedier/frp/pkg/util/http"
+	"github.com/fatedier/frp/pkg/util/kube"
 	"github.com/fatedier/frp/pkg/util/log"
 	netpkg "github.com/fatedier/frp/pkg/util/net"
 	"github.com/fatedier/frp/pkg/util/tcpmux"
@@ -54,6 +55,8 @@ import (
 	"github.com/fatedier/frp/server/ports"
 	"github.com/fatedier/frp/server/proxy"
 	"github.com/fatedier/frp/server/visitor"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -93,6 +96,9 @@ type Service struct {
 
 	// Accept pipe connections from ssh tunnel gateway
 	sshTunnelListener *netpkg.InternalListener
+
+	// Kubernetes client for managing custom domain labels
+	kubeClient kubernetes.Interface
 
 	// Manage all controllers
 	ctlManager *ControlManager
@@ -307,6 +313,25 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 
 	// Create https vhost muxer.
 	if cfg.VhostHTTPSPort > 0 {
+		// clean up old custom domain labels
+		if kube.IsKubernetes() {
+			config, err := rest.InClusterConfig()
+			if err != nil {
+				return nil, err
+			}
+
+			clientset, err := kubernetes.NewForConfig(config)
+			if err != nil {
+				return nil, err
+			}
+
+			svr.rc.KubeClient = clientset
+
+			if err := kube.RemoveAllCustomDomainLabelsFromPod(svr.ctx, clientset); err != nil {
+				return nil, fmt.Errorf("failed to remove all custom domain labels from pod: %v", err)
+			}
+		}
+
 		var l net.Listener
 		if httpsMuxOn {
 			l = svr.muxer.ListenHTTPS(1)

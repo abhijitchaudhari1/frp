@@ -22,6 +22,7 @@ import (
 	"github.com/fatedier/frp/server/group"
 	"github.com/fatedier/frp/server/ports"
 	"github.com/fatedier/frp/server/visitor"
+	"k8s.io/client-go/kubernetes"
 )
 
 // All resource managers and controllers
@@ -58,6 +59,8 @@ type ResourceController struct {
 
 	// All server manager plugin
 	PluginManager *plugin.Manager
+
+	KubeClient kubernetes.Interface
 }
 
 func (rc *ResourceController) Close() error {
